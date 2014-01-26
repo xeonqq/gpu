@@ -57,28 +57,29 @@ __device__ float complex_abs(pixel_complex *a);
 __global__ void fractal(unsigned char* output, int width, int height, pixel_complex lowerLeft, pixel_complex upperRight)
 {
 	int x = blockIdx.x*blockDim.x+threadIdx.x;
-	int y = blockIdx.y*blockDim.y+threadIdx.y;
-
-	if(x < IMG_WIDTH && y < IMG_HEIGHT)
-	{
-		unsigned char i = 0;
-		pixel_complex zn = {0,0};
-		pixel_complex c;
-
-		c.real = (float)x/(float)(width-1) *(upperRight.real - lowerLeft.real) + lowerLeft.real;
-		c.img  = (float)y/(float)(height-1)*(upperRight.img - lowerLeft.img) + lowerLeft.img;
-
-		while((complex_abs(&zn) < 1.0) && (i < 255))
+	//int y = blockIdx.y*blockDim.y+threadIdx.y;
+	for(int y = 0; y < IMG_HEIGHT; y++){
+		if(x < IMG_WIDTH)
 		{
-			complex_power3(&zn);
-			complex_add(&zn, &c, &zn);
-			i++;
-		}
+			unsigned char i = 0;
+			pixel_complex zn = {0,0};
+			pixel_complex c;
 
-		if(i==255)
-			output[x+y*width] = 0;//0 is black
-		else
-			output[x+y*width] = i;
+			c.real = (float)x/(float)(width-1) *(upperRight.real - lowerLeft.real) + lowerLeft.real;
+			c.img  = (float)y/(float)(height-1)*(upperRight.img - lowerLeft.img) + lowerLeft.img;
+
+			while((complex_abs(&zn) < 1.0) && (i < 255))
+			{
+				complex_power3(&zn);
+				complex_add(&zn, &c, &zn);
+				i++;
+			}
+
+			if(i==255)
+				output[x+y*width] = 0;//0 is black
+			else
+				output[x+y*width] = i;
+		}
 	}
 }
 
@@ -112,8 +113,9 @@ int main(int argc, char** argv) {
 
 	cudaMalloc((void**)&out,sizeof(unsigned char)*IMG_WIDTH*IMG_HEIGHT);
 
-	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
-	dim3 grid = dim3((IMG_WIDTH/threads.x),(IMG_HEIGHT/threads.y)); 
+	//dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
+	dim3 threads = dim3(BLOCK_SIZEX);
+	dim3 grid = dim3((IMG_WIDTH/threads.x)); 
 
 	pixel_complex lowerLeft = {-2, -1};
 	pixel_complex upperRight = {2, 1};
