@@ -19,6 +19,8 @@ Show all frames:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
@@ -70,8 +72,9 @@ unsigned char get_pixel_chroma(unsigned char* frame, int x, int y, unsigned widt
 unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height)
 {
 	int sum=0;
-	for (int i=0; i < 16; i++)
-		for (int j=0; j < 16; j++)  
+	int i,j;
+	for (i=0; i < 16; i++)
+		for (j=0; j < 16; j++)  
 			sum += ABS( get_pixel(b,ax+j,ay+i,width,height) - get_pixel(a,bx+j,by+i,width,height) );
 	return sum;
 }
@@ -89,15 +92,16 @@ void motion_search(unsigned char* a,unsigned char* b, unsigned width, unsigned h
 {
 	int blocks_x=width/16;
 	int blocks_y=height/16;
-	for (int i=0; i < blocks_y ; i++)		// For all blocks in Y direction
+	int i,j,s,t;
+	for (i=0; i < blocks_y ; i++)		// For all blocks in Y direction
 	{
 	 //  printf(".");
-		for (int j=0; j < blocks_x ; j++)   // For all blocks in X direction
+		for (j=0; j < blocks_x ; j++)   // For all blocks in X direction
 		{
 			int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 			int best_x,best_y=0;
-			for (int s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
-				for (int t=-15 ; t<16 ; t++)
+			for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
+				for (t=-15 ; t<16 ; t++)
 				{
 					int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
 																												// Second image block shifted with (s,t)
@@ -136,9 +140,10 @@ void reconstruct_image(unsigned char* a, unsigned width, unsigned height, int* v
 {
 	int blocks_x=width/16;
 	unsigned char* output=(unsigned char*)malloc(width*height*3/2);
-	for (int i=0; i< height; i++)
-   {
-		for (int j=0; j< width; j++)
+	int i,j;
+	for (i=0; i< height; i++)
+	{
+		for (j=0; j< width; j++)
 		{
 			unsigned mb=(j/16)+(i/16)*blocks_x;
 			int mx=vx[mb];
@@ -146,9 +151,9 @@ void reconstruct_image(unsigned char* a, unsigned width, unsigned height, int* v
 			output[j+i*width]=get_pixel(a,j+mx,i+my,width,height);
 		}
 	}
-	for (int i=0; i< height/2; i++)
-   {
-		for (int j=0; j< width/2; j++)
+	for (i=0; i< height/2; i++)
+	{
+		for (j=0; j< width/2; j++)
 		{
 			unsigned mb=(j/8)+(i/8)*blocks_x;
 			int mx=vx[mb];
@@ -169,10 +174,28 @@ int main(int argc,char **args)
 	int num_blocks=(1920*800)/(16*16);
 	int vx[num_blocks];				// Reserve some memory for motion vectors
 	int vy[num_blocks];
+	cudaEvent_t start;
+	cudaEvent_t stop;
+	float msecTotal;
+	int i;
+
 	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
 	load_picture(&current_frame,"frameB.yuv");
-   motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
-	for(int i=0;i<num_blocks;i++) 									// Display motion vectors
+
+	cudaEventCreate(&start);
+	cudaEventRecord(start, NULL); 
+
+	motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
+
+	cudaEventCreate(&stop);
+	cudaEventRecord(stop, NULL);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&msecTotal, start, stop);    
+	float flop=150.42*1e+9;
+	printf("time takes\n");
+	printf("Processing time: %f (ms), GFLOPS: %f \n", msecTotal, flop / msecTotal/ 1e+6);
+
+	for(i=0;i<num_blocks;i++) 									// Display motion vectors
 	{	
 		printf("\n X:%i Y:%i",vx[i],vy[i]);
 	}
