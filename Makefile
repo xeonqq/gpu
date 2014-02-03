@@ -127,7 +127,7 @@ build: motion
 #writepgm.o : writepgm.c $(HEADERS)
 #	        $(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-motion.o: motion.c $(HEADERS)
+motion.o: motion.cu $(HEADERS)
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 motion: motion.o 
