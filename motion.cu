@@ -24,8 +24,8 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 #define BLOCK_SIZEX 16
 #define BLOCK_SIZEY 16
 
-#define THREAD_DIMX 1920/16
-#define THREAD_DIMY 800/16
+#define THREAD_DIMX 1920/16	// Number of blocks in X direction
+#define THREAD_DIMY 800/16	// Number of blocks in Y direction
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
