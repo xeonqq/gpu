@@ -200,16 +200,21 @@ int main(int argc,char **args)
 	cudaError_t err_2 = cudaMalloc((void**)&current_gpu,sizeof(unsigned char)*1920*800*3/2);
 	if(err_2 != 0)
 		printf("current_gpu alloc failed\n");
-	cudaError_t err_3 = cudaMalloc((void**)&vx_gpu,sizeof(unsigned char)*num_blocks);
+	cudaError_t err_3 = cudaMalloc((void**)&vx_gpu,sizeof(int)*num_blocks);
 	if(err_3 != 0)
 		printf("vx_gpu alloc failed\n");
-	cudaError_t err_4 = cudaMalloc((void**)&vy_gpu,sizeof(unsigned char)*num_blocks);
+	cudaError_t err_4 = cudaMalloc((void**)&vy_gpu,sizeof(int)*num_blocks);
 	if(err_4 != 0)
 		printf("vy_gpu alloc failed\n");
 
 	
-	cudaMemcpy(ref_gpu,ref_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
-	cudaMemcpy(current_gpu,current_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
+	cudaError_t err_5 = cudaMemcpy(ref_gpu,ref_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
+	
+	if(err_5 != 0)
+		printf("ref_gpu memcpy failed\n");
+	cudaError_t err_6 = cudaMemcpy(current_gpu,current_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
+	if(err_6 != 0)
+		printf("current_gpu memcpy failed\n");
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
 	dim3 grid = dim3(ceil((THREAD_DIMX/threads.x)),ceil((THREAD_DIMY/threads.y)));
