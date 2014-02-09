@@ -221,8 +221,13 @@ int main(int argc,char **args)
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
-	cudaMemcpy(vx,vx_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
-	cudaMemcpy(vy,vy_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
+	cudaError_t err_7 = cudaMemcpy(vx,vx_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
+	if(err_7 != 0)
+		printf("vx memcpy failed\n");
+
+	cudaError_t err_8 = cudaMemcpy(vy,vy_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
+	if(err_8 != 0)
+		printf("vy memcpy failed\n");
 	cudaEventCreate(&stop);
 	cudaEventRecord(stop, NULL);
 	cudaEventSynchronize(stop);
