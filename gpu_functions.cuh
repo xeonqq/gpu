@@ -5,9 +5,8 @@ __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, in
 
 __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width, unsigned height, int* vx, int* vy)
 {
-
-	int i = blockIdx.y*blockDim.y+threadIdx.y; // X direction
-	int j = blockIdx.x*blockDim.x+threadIdx.x; // Y direction
+	int j = blockIdx.y*blockDim.y+threadIdx.y; // Block in X axis
+	int i = blockIdx.x*blockDim.x+threadIdx.x; // Block in Y axis
 
 	int blocks_x = width/16;
 	int blocks_y = height/16;
@@ -16,12 +15,12 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
 
-	if((j < blocks_y) && (i < blocks_x) )
+	if((i < blocks_y) && (j < blocks_x) )
 	{
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
-				int sad=calculate_sad(a,b,i*16,j*16,i*16+t,j*16+s,  width, height);	// Calculate difference between block from first image and second image
+				int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
 				// Second image block shifted with (s,t)
 				if (sad < best_diff)			// If we found a better match then store it
 				{
@@ -31,8 +30,8 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width
 				}
 			}
 		//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
-		vx[i+j*blocks_x] = best_x;			// Store result
-		vy[i+j*blocks_x] = best_y;
+		vx[j+i*blocks_x] = best_x;			// Store result
+		vy[j+i*blocks_x] = best_y;
 	}
 }
 
