@@ -2,33 +2,38 @@
 
 __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned width, unsigned height);
 __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height);
- 
+
 __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width, unsigned height, int* vx, int* vy)
 {
 
-	int j = blockIdx.x*blockDim.x+threadIdx.x;
-	int i = blockIdx.y*blockDim.y+threadIdx.y;
-	int blocks_x=width/16;
+	int j = blockIdx.y*blockDim.y+threadIdx.y;
+	int i = blockIdx.x*blockDim.x+threadIdx.x;
+
+	int blocks_x = width/16;
+	int blocks_y = height/16;
 
 	int s,t;
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
-	for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
-		for (t=-15 ; t<16 ; t++)
-		{
-			int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
-			// Second image block shifted with (s,t)
-			if (sad < best_diff)			// If we found a better match then store it
-			{
-				best_x = t;
-				best_y = s;
-				best_diff = sad;
-			}
-		}
-	//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
-	vx[j+i*blocks_x] = best_x;			// Store result
-	vy[j+i*blocks_x] = best_y;
 
+	if((i < blocks_y) && (j < blocks_x) )
+	{
+		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
+			for (t=-15 ; t<16 ; t++)
+			{
+				int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
+				// Second image block shifted with (s,t)
+				if (sad < best_diff)			// If we found a better match then store it
+				{
+					best_x = t;
+					best_y = s;
+					best_diff = sad;
+				}
+			}
+		//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
+		vx[j+i*blocks_x] = best_x;			// Store result
+		vy[j+i*blocks_x] = best_y;
+	}
 }
 
 // Gets a pixel from the Luma plane of the image, takes care of boundaries
