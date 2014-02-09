@@ -203,7 +203,7 @@ int main(int argc,char **args)
 	cudaMemcpy(current_gpu,current_frame,sizeof(unsigned char)*(1920*800),cudaMemcpyHostToDevice); 
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
-	dim3 grid = dim3(ceil((THREAD_DIMX/threads.x)),ceil((THREAD_DIMY/threads.y)));
+	dim3 grid = dim3(ceil((THREAD_DIMY/threads.y)),ceil((THREAD_DIMX/threads.x)));
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
