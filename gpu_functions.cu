@@ -11,13 +11,13 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	int j = blockIdx.x*blockDim.x+threadIdx.x; // Block in X axis
 
 	int blocks_x = width/16;
-	//int blocks_y = height/16;
+	int blocks_y = height/16;
 
 	int s,t;
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
 
-	//if((i < blocks_y) && (j < blocks_x) )
+	if((i < blocks_y) && (j < blocks_x) )
 	{
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
