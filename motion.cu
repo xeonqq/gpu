@@ -20,7 +20,7 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "gpu_functions.cuh"
+//#include "gpu_functions.cuh"
 #define BLOCK_SIZEX 16
 #define BLOCK_SIZEY 16
 
@@ -28,6 +28,8 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 #define THREAD_DIMY 800/16	// Number of blocks in Y direction
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
+
+extern __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy);
 
 
 // Gets a pixel from the Luma plane of the image, takes care of boundaries
@@ -171,13 +173,16 @@ void reconstruct_image(unsigned char* a, unsigned width, unsigned height, int* v
 	free(output);
 }
 
+
 int main(int argc,char **args)
 {
 	unsigned char* ref_frame;
 	unsigned char* current_frame;
 	int num_blocks=(1920*800)/(16*16);
-	int vx[num_blocks];				// Reserve some memory for motion vectors
-	int vy[num_blocks];
+	//int vx[num_blocks];				// Reserve some memory for motion vectors
+	//int vx[num_blocks];				// Reserve some memory for motion vectors
+	int *vy;
+	int *vx;
 	cudaEvent_t start;
 	cudaEvent_t stop;
 	float msecTotal;
@@ -187,13 +192,18 @@ int main(int argc,char **args)
 	unsigned char* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
+	
 
 	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
 	load_picture(&current_frame,"frameB.yuv");
 	cudaEventCreate(&start);
 	cudaEventRecord(start, NULL); 
 
+	vx = 	(int*) malloc(sizeof(int)*num_blocks);
+	vy = 	(int*) malloc(sizeof(int)*num_blocks);
 
+	memset(vx, 0, num_blocks);
+	memset(vy, 0, num_blocks);
 	cudaError_t err_1 = cudaMalloc((void**)&ref_gpu,sizeof(unsigned char)*1920*800*3/2);
 	if(err_1 != 0)
 		printf("ref_gpu alloc failed\n");
@@ -217,10 +227,11 @@ int main(int argc,char **args)
 		printf("current_gpu memcpy failed\n");
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
-	dim3 grid = dim3(ceil((THREAD_DIMX/threads.x)),ceil((THREAD_DIMY/threads.y)));
+	dim3 grid = dim3(((THREAD_DIMX/threads.x)),((THREAD_DIMY/threads.y)));
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
+
 	cudaError_t err_7 = cudaMemcpy(vx,vx_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
 	if(err_7 != 0)
 		printf("vx memcpy failed\n");

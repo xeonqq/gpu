@@ -3,19 +3,21 @@
 __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned width, unsigned height);
 __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height);
 
-__global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width, unsigned height, int* vx, int* vy)
+__global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy)
 {
-	int j = blockIdx.y*blockDim.y+threadIdx.y; // Block in X axis
-	int i = blockIdx.x*blockDim.x+threadIdx.x; // Block in Y axis
+	//int j = blockIdx.y*blockDim.y+threadIdx.y; // Block in X axis
+	//int i = blockIdx.x*blockDim.x+threadIdx.x; // Block in Y axis
+	int i = blockIdx.y*blockDim.y+threadIdx.y; // Block in Y axis
+	int j = blockIdx.x*blockDim.x+threadIdx.x; // Block in X axis
 
 	int blocks_x = width/16;
-	int blocks_y = height/16;
+	//int blocks_y = height/16;
 
 	int s,t;
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
 
-	if((i < blocks_y) && (j < blocks_x) )
+	//if((i < blocks_y) && (j < blocks_x) )
 	{
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
@@ -30,6 +32,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned width
 				}
 			}
 		//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
+		//printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
 		vx[j+i*blocks_x] = best_x;			// Store result
 		vy[j+i*blocks_x] = best_y;
 	}
