@@ -188,11 +188,13 @@ int main(int argc,char **args)
 	float msecTotal;
 	int i;
 
+	unsigned char Bs[256];
 	unsigned char* ref_gpu;
 	unsigned char* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
 	
+	int k,l;
 
 	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
 	load_picture(&current_frame,"frameB.yuv");
@@ -218,17 +220,28 @@ int main(int argc,char **args)
 		printf("vy_gpu alloc failed\n");
 
 	
-	cudaError_t err_5 = cudaMemcpy(ref_gpu,ref_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
+	cudaError_t err_5 = cudaMemcpy(ref_gpu,ref_frame,sizeof(unsigned char)*(1920*800),cudaMemcpyHostToDevice); 
 	
 	if(err_5 != 0)
 		printf("ref_gpu memcpy failed\n");
-	cudaError_t err_6 = cudaMemcpy(current_gpu,current_frame,sizeof(unsigned char)*(1920*800*3/2),cudaMemcpyHostToDevice); 
+	cudaError_t err_6 = cudaMemcpy(current_gpu,current_frame,sizeof(unsigned char)*(1920*800),cudaMemcpyHostToDevice); 
 	if(err_6 != 0)
 		printf("current_gpu memcpy failed\n");
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
 	dim3 grid = dim3(((THREAD_DIMX/threads.x)+1),((THREAD_DIMY/threads.y))+1);
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
+
+	for (k=1904; k<1920; k++)
+		printf("%d ",current_frame[k]);
+
+		for (k=0; k<16; k++)
+			for (l=0; l<16; l++)
+				Bs[k*16 + l] = current_frame[(k) * 1920 + (1904+l)];
+	printf("\n");	
+	for (k=0; k<16; k++)
+		printf("%d ",Bs[k]);
+	
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
 

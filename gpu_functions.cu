@@ -16,13 +16,21 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	int s,t;
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
+	int k,l;
+
+
+	__shared__ unsigned char Bs[256];
+
 
 	if((i < blocks_y) && (j < blocks_x) )
 	{
+		for (k=0; k<16; k++)
+			for (l=0; l<16; l++)
+				Bs[k*16 + l] = b[((i*16+k) * width) + (j*16+l)];
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
-				int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
+				int sad=calculate_sad(a,Bs,0,0,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
 				// Second image block shifted with (s,t)
 				if (sad < best_diff)			// If we found a better match then store it
 				{
@@ -61,7 +69,7 @@ __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, in
 	int i,j;
 	for (i=0; i < 16; i++)
 		for (j=0; j < 16; j++)  
-			sum += ABS( get_pixel(b,ax+j,ay+i,width,height) - get_pixel(a,bx+j,by+i,width,height) );
+			sum += ABS( b[i*16+j] - get_pixel(a,bx+j,by+i,width,height) );
 	return sum;
 }
 
