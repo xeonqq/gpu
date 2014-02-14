@@ -19,7 +19,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	int k,l;
 
 
-	__shared__ unsigned char Bs[256];
+	unsigned char Bs[256];
 
 
 	if((i < blocks_y) && (j < blocks_x) )
