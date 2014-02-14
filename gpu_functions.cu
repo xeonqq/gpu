@@ -1,3 +1,5 @@
+#include "motion.h"
+
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
 __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned width, unsigned height);
@@ -19,14 +21,13 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	int k,l;
 
 
-	__shared__ unsigned char Bs[256];
-
+	__shared__ unsigned char Bs[256*BLOCK_SIZEX*BLOCK_SIZEY];
 
 	if((i < blocks_y) && (j < blocks_x) )
 	{
 		for (k=0; k<16; k++)
 			for (l=0; l<16; l++)
-				Bs[k*16 + l] = b[((i*16+k) * width) + (j*16+l)];
+				Bs[blockDim.x*16*( threadIdx.y*16+ k) + l+(threadIdx.x*16)] = b[((i*16+k) * width) + (j*16+l)];
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
@@ -69,7 +70,7 @@ __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, in
 	int i,j;
 	for (i=0; i < 16; i++)
 		for (j=0; j < 16; j++)  
-			sum += ABS( b[i*16+j] - get_pixel(a,bx+j,by+i,width,height) );
+			sum += ABS( b[blockDim.x*16*(threadIdx.y*16 + i) + j+(threadIdx.x*16)] - get_pixel(a,bx+j,by+i,width,height) );
 	return sum;
 }
 

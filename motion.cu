@@ -19,10 +19,9 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "motion.h"
 
 //#include "gpu_functions.cuh"
-#define BLOCK_SIZEX 16
-#define BLOCK_SIZEY 16
 
 #define THREAD_DIMX 1920/16	// Number of blocks in X direction
 #define THREAD_DIMY 800/16	// Number of blocks in Y direction
@@ -188,14 +187,11 @@ int main(int argc,char **args)
 	float msecTotal;
 	int i;
 
-	unsigned char Bs[256];
 	unsigned char* ref_gpu;
 	unsigned char* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
 	
-	int k,l;
-
 	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
 	load_picture(&current_frame,"frameB.yuv");
 	cudaEventCreate(&start);
@@ -231,17 +227,6 @@ int main(int argc,char **args)
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
 	dim3 grid = dim3(((THREAD_DIMX/threads.x)+1),((THREAD_DIMY/threads.y))+1);
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
-
-	for (k=1904; k<1920; k++)
-		printf("%d ",current_frame[k]);
-
-		for (k=0; k<16; k++)
-			for (l=0; l<16; l++)
-				Bs[k*16 + l] = current_frame[(k) * 1920 + (1904+l)];
-	printf("\n");	
-	for (k=0; k<16; k++)
-		printf("%d ",Bs[k]);
-	
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
 
