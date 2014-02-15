@@ -29,7 +29,7 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
-extern __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy);
+extern __global__ void  motion_search(unsigned int* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy);
 
 
 // Gets a pixel from the Luma plane of the image, takes care of boundaries
@@ -139,6 +139,17 @@ void load_picture(unsigned char** dest, char* filename)
 	fclose(f);
 }
 
+void load_picture_int(unsigned int** dest, char* filename)
+{
+	FILE *f=fopen(filename,"rb");
+	if (f == NULL) {
+		printf("\nERROR: Could not open %s ...",filename);
+		exit(-1);
+	}
+	*dest = (unsigned int*)malloc(1920*800*3/2);
+	fread(*dest,1920*800*3/8,sizeof(unsigned int),f);
+	fclose(f);
+}
 
 // Reconstructions a image from reference image and motion vectors
 // This is just to show the concept, you do not need to move this to the GPU or change anything about this
@@ -176,7 +187,8 @@ void reconstruct_image(unsigned char* a, unsigned width, unsigned height, int* v
 
 int main(int argc,char **args)
 {
-	unsigned char* ref_frame;
+	//unsigned char* reference_frame;
+	unsigned int* ref_frame;
 	unsigned char* current_frame;
 	int num_blocks=(1920*800)/(16*16);
 	//int vx[num_blocks];				// Reserve some memory for motion vectors
@@ -188,15 +200,13 @@ int main(int argc,char **args)
 	float msecTotal;
 	int i;
 
-	unsigned char Bs[256];
-	unsigned char* ref_gpu;
+	//unsigned char* ref_gpu;
+	unsigned int* ref_gpu;
 	unsigned char* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
 	
-	int k,l;
-
-	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
+	load_picture_int(&ref_frame,"frameA.yuv");							// Load pictures
 	load_picture(&current_frame,"frameB.yuv");
 	cudaEventCreate(&start);
 	cudaEventRecord(start, NULL); 
@@ -232,17 +242,6 @@ int main(int argc,char **args)
 	dim3 grid = dim3(((THREAD_DIMX/threads.x)+1),((THREAD_DIMY/threads.y))+1);
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
-	for (k=1904; k<1920; k++)
-		printf("%d ",current_frame[k]);
-
-		for (k=0; k<16; k++)
-			for (l=0; l<16; l++)
-				Bs[k*16 + l] = current_frame[(k) * 1920 + (1904+l)];
-	printf("\n");	
-	for (k=0; k<16; k++)
-		printf("%d ",Bs[k]);
-	
-
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
 
 	cudaError_t err_7 = cudaMemcpy(vx,vx_gpu,sizeof(int)*num_blocks,cudaMemcpyDeviceToHost);
@@ -263,7 +262,7 @@ int main(int argc,char **args)
 	for(i=0;i<num_blocks;i++) // Display motion vectors
 		printf("\n X:%i Y:%i",vx[i],vy[i]);
 
-	reconstruct_image(ref_frame,1920,800,vx,vy,"output.yuv");	// Reconstruct image
+	//reconstruct_image(ref_frame,1920,800,vx,vy,"output.yuv");	// Reconstruct image
 	free(current_frame);
 	free(ref_frame);
 }
