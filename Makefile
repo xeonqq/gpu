@@ -56,7 +56,7 @@ endif
 DARWIN = $(strip $(findstring DARWIN, $(OSUPPER)))
 
 # Location of the CUDA Toolkit binaries and libraries
-CUDA_PATH       ?= /usr/local/cuda50
+CUDA_PATH       ?= /usr/local/cuda-5.5
 CUDA_INC_PATH   ?= $(CUDA_PATH)/include
 CUDA_BIN_PATH   ?= $(CUDA_PATH)/bin
 ifneq ($(DARWIN),)
@@ -93,7 +93,7 @@ else
       LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
       CCFLAGS   := -m32
   else
-      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
+      LDFLAGS   := -L$(CUDA_LIB_PATH)
       CCFLAGS   := -m64
   endif
 endif
