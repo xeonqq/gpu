@@ -21,7 +21,7 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 #include <stdlib.h>
 
 //#include "gpu_functions.cuh"
-#define BLOCK_SIZEX 16
+#define BLOCK_SIZEX 16 
 #define BLOCK_SIZEY 16
 
 #define THREAD_DIMX 1920/16	// Number of blocks in X direction
@@ -29,7 +29,8 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
-extern __global__ void  motion_search(unsigned int* a,unsigned int* b, unsigned int width, unsigned int height, int* vx, int* vy);
+extern __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy);
+//extern __global__ void  motion_search(unsigned int* a,unsigned int* b, unsigned int width, unsigned int height, int* vx, int* vy);
 
 
 // Gets a pixel from the Luma plane of the image, takes care of boundaries
@@ -184,13 +185,81 @@ void reconstruct_image(unsigned char* a, unsigned width, unsigned height, int* v
 	free(output);
 }
 
+uchar4 get_pixel_w(unsigned char* frame, int x, int y, unsigned width, unsigned height) 
+{
+	uchar4 buf;
+	int l,k;
+	l = x;
+	k = y;
+
+	if(x >= 0 && x < width && y >=0 && y < height)
+	{
+		buf = ((uchar4 *)frame)[(y * width + x) >> 2];
+		//printf("\nword is %d %d %d %d",buf.x,buf.y,buf.z,buf.w);
+		return buf;
+	}
+
+	if(y < 0 || y >= height)
+	{
+		if (x >= width) l=width-1;
+		if (x < 0) l=0;
+		if (y >= height) k=height-1;
+		if (y < 0) k=0;
+
+		if(x < 0 || x >= width)
+		{
+			buf.x = frame[(k * width) + l];
+			buf.y = buf.x; 
+			buf.z = buf.x;
+			buf.w = buf.x;
+			return buf;
+		}
+		
+		return(((uchar4 *)frame)[((k * width) + l)>>2]);
+	}
+
+	if(x < 0 || x <= width)
+	{
+		if (x >= width) l=width-1;
+		if (x < 0) l=0;
+		if (y >= height) k=height-1;
+		if (y < 0) k=0;
+
+		buf.x = frame[(k * width) + l];
+		buf.y = buf.x; 
+		buf.z = buf.x;
+		buf.w = buf.x;
+	}
+
+	return buf;
+}
+
+uchar4 get_pixel_word_upd(unsigned char* frame, int x, int y, unsigned int width, unsigned int height) 
+{
+	uchar4 buf;
+	if((x >= 0) && (x < (width-3)) && (y >= 0) && (y < height))
+	{
+		//buf = ((uchar4 *)frame)[(y * (width >> 2) + (x>>2))];
+		buf = *((uchar4*) (frame + (y*width) + x));
+		
+	      //printf("\nword is %d %d %d %d",buf.x,buf.y,buf.z,buf.w);
+	}
+	else
+	{
+			buf.x = get_pixel_host(frame,x,y,width,height);
+			buf.y = get_pixel_host(frame,x+1,y,width,height);
+			buf.z = get_pixel_host(frame,x+2,y,width,height);
+			buf.w = get_pixel_host(frame,x+3,y,width,height);
+	}
+	return buf;
+}
 
 int main(int argc,char **args)
 {
-	//unsigned char* reference_frame;
-	unsigned int* ref_frame;
-	//unsigned char* current_frame;
-	unsigned int* current_frame;
+	unsigned char* ref_frame;
+	//unsigned int* ref_frame;
+	unsigned char* current_frame;
+	//unsigned int* current_frame;
 	int num_blocks=(1920*800)/(16*16);
 	//int vx[num_blocks];				// Reserve some memory for motion vectors
 	//int vx[num_blocks];				// Reserve some memory for motion vectors
@@ -201,15 +270,63 @@ int main(int argc,char **args)
 	float msecTotal;
 	int i;
 
-	//unsigned char* ref_gpu;
-	unsigned int* ref_gpu;
-	//unsigned char* current_gpu;
-	unsigned int* current_gpu;
+	//int k,l;
+	
+	//uchar4 temp;
+
+	
+	unsigned char* ref_gpu;
+	//unsigned int* ref_gpu;
+	unsigned char* current_gpu;
+	//unsigned int* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
 	
-	load_picture_int(&ref_frame,"frameA.yuv");							// Load pictures
-	load_picture_int(&current_frame,"frameB.yuv");
+	load_picture(&ref_frame,"frameA.yuv");							// Load pictures
+	load_picture(&current_frame,"frameB.yuv");
+
+#if 0
+	//for(k=0; k < 16; k++)
+	{
+		printf("\n");
+		for (k=-16; k<800+16; k++)
+		{
+			printf("\n");
+			for(l=-16; l < 1920+16; l++)
+			{
+				//printf("%d ", ref_frame[k*1920 + l]);
+				temp = get_pixel_word_upd(ref_frame, l, k, 1920, 800);
+				//temp = *((uchar4*) (ref_frame + k*1920 + l));
+				//printf("%d\t%d\t%d\t%d",temp.x, temp.y, temp.z, temp.w );
+				printf("%d %d\n", k, l);
+			}
+		}
+
+		printf("Last = %d\t", ref_frame[1919]);
+
+	}
+	temp = *((uchar4*) (ref_frame + 1));
+	printf("\npack = %d\t%d\t%d\t%d",temp.x, temp.y, temp.z, temp.w );
+
+#endif
+//	temp = ((uchar4 *)ref_frame)[1];
+//	printf("\nTesting now\n");
+	//for(l=0; l<4; l++)
+//		printf("\npack = %d\t%d\t%d\t%d",temp.x, temp.y, temp.z, temp.w );
+//		printf("\nRef = %d\t%d\t%d\t%d",ref_frame[4], ref_frame[5], ref_frame[6], ref_frame[7] );
+#if 0
+	printf("\nGetting now\n");
+
+	//for(k=-1; k < 0; k++)
+	{
+		printf("\n");
+		for(l=0; l < 16; l+=4)
+		{
+			temp = get_pixel_w(ref_frame, 24+l, 0, 1920, 800);
+			printf("%d\t%d\t%d\t%d\t", temp.x, temp.y, temp.z, temp.w);
+		}
+	}
+#endif
 	cudaEventCreate(&start);
 	cudaEventRecord(start, NULL); 
 
