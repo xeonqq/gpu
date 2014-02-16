@@ -56,7 +56,7 @@ endif
 DARWIN = $(strip $(findstring DARWIN, $(OSUPPER)))
 
 # Location of the CUDA Toolkit binaries and libraries
-CUDA_PATH       ?= /usr/local/cuda
+CUDA_PATH       ?= /usr/local/cuda-5.5
 CUDA_INC_PATH   ?= $(CUDA_PATH)/include
 CUDA_BIN_PATH   ?= $(CUDA_PATH)/bin
 ifneq ($(DARWIN),)
@@ -76,12 +76,20 @@ GCC             ?= g++
 # Extra user flags
 EXTRA_NVCCFLAGS ?=
 EXTRA_LDFLAGS   ?=
+<<<<<<< HEAD
+=======
+GENCODE_FLAGS   ?=
+>>>>>>> f0c3045752a5dd58f78d3b78007f1c0f8f77b475
 
 # CUDA code generation flags
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
 GENCODE_SM20    := -gencode arch=compute_20,code=sm_20
 GENCODE_SM30    := -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
+<<<<<<< HEAD
 GENCODE_FLAGS   :=  $(GENCODE_SM20)
+=======
+#GENCODE_FLAGS   :=  $(GENCODE_SM20)
+>>>>>>> f0c3045752a5dd58f78d3b78007f1c0f8f77b475
 
 # OS-specific build flags
 ifneq ($(DARWIN),) 
@@ -117,11 +125,16 @@ endif
 # Common includes and paths for CUDA
 INCLUDES      := -I$(CUDA_INC_PATH) -I. -I.. -I../../common/inc
 
+<<<<<<< HEAD
 HEADERS := writepgm.h
+=======
+#HEADERS := writepgm.h
+>>>>>>> f0c3045752a5dd58f78d3b78007f1c0f8f77b475
 
 # Target rules
 all: build
 
+<<<<<<< HEAD
 build: fractal
 
 writepgm.o : writepgm.c $(HEADERS)
@@ -132,12 +145,33 @@ fractal.o: fractal.cu gpu_functions.cuh $(HEADERS)
 
 fractal: writepgm.o fractal.o 
 	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
+=======
+build: motion 
+
+#writepgm.o : writepgm.c $(HEADERS)
+#	        $(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
+gpu_functions.o:  gpu_functions.cu $(HEADERS)
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
+
+motion.o: motion.cu $(HEADERS)
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
+
+motion: gpu_functions.o motion.o 
+	$(NVCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
+>>>>>>> f0c3045752a5dd58f78d3b78007f1c0f8f77b475
 	mkdir -p ../bin/$(OSLOWER)/$(TARGET)
 	cp $@ ../bin/$(OSLOWER)/$(TARGET)
 
 run: build
+<<<<<<< HEAD
 	./fractal
 
 clean:
 	rm -f fractal *.o *.pgm
+=======
+	./motion
+
+clean:
+	rm -f motion *.o output.yuv
+>>>>>>> f0c3045752a5dd58f78d3b78007f1c0f8f77b475
 
