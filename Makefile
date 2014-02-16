@@ -93,7 +93,7 @@ else
       LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
       CCFLAGS   := -m32
   else
-      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
+      LDFLAGS   := -L$(CUDA_LIB_PATH)
       CCFLAGS   := -m64
   endif
 endif
