@@ -5,8 +5,10 @@ __device__ unsigned calculate_sad(unsigned int* a,unsigned char* b,  int ax, int
 
 __shared__ unsigned int count_ref;
 __shared__ unsigned int word_ref;
+__shared__ unsigned int count;
+__shared__ unsigned int word;
 
-__global__ void  motion_search(unsigned int* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy)
+__global__ void  motion_search(unsigned int* a,unsigned int* b, unsigned int width, unsigned int height, int* vx, int* vy)
 {
 	//int j = blockIdx.y*blockDim.y+threadIdx.y; // Block in X axis
 	//int i = blockIdx.x*blockDim.x+threadIdx.x; // Block in Y axis
@@ -27,16 +29,28 @@ __global__ void  motion_search(unsigned int* a,unsigned char* b, unsigned int wi
 
 	if((i < blocks_y) && (j < blocks_x) )
 	{
+		//for (k=0; k<16; k++)
+		//	for (l=0; l<16; l++)
+		//		Bs[k*16 + l] = b[((i*16+k) * width) + (j*16+l)];
 		for (k=0; k<16; k++)
-			for (l=0; l<16; l++)
-				Bs[k*16 + l] = b[((i*16+k) * width) + (j*16+l)];
+			for (l=0; l<4; l++)
+			{
+				int reg = b[((i*16+k) * (width/4)) + (j*4+l)];
+				//Bs[blockDim.x*4*(threadIdx.y*16 + k) + l + (threadIdx.x*4)] = b[((i*16+k) * (width/4)) + (j*4+l)];
+				Bs[k*16+4*l] = reg & 0xFF;
+				Bs[k*16+4*l+1] = (reg >> 8) & 0xFF;
+				Bs[k*16+4*l+2] = (reg >> 16) & 0xFF;
+				Bs[k*16+4*l+3] = (reg >> 24) & 0xFF;
+			}
 
 		count_ref = 0;
+		count = 0;
 
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
 				int sad=calculate_sad(a,Bs,0,0,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
+				//int sad=calculate_sad(a,b,j*16,i*16,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
 				// Second image block shifted with (s,t)
 				if (sad < best_diff)			// If we found a better match then store it
 				{
@@ -61,7 +75,6 @@ __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned 
 	if (y < 0) y=0;
 	return frame[x+y*width];
 }
-
 __device__ unsigned char get_pixel_ref(unsigned int* frame, int x, int y, unsigned width, unsigned height)
 {
 	unsigned char boundary = count_ref & 3;
@@ -134,6 +147,18 @@ __device__ unsigned char get_pixel_ref(unsigned int* frame, int x, int y, unsign
 	return((word_ref >> ((x&3)<<3)) & 0xFF);
 }
 
+__device__ unsigned char get_pixel_current(unsigned int* frame, int x, int y)
+{
+	unsigned char boundary = count & 3;
+
+	if(!boundary)
+		word = frame[y*4 + (x>>2)];
+	else
+		count++;
+
+	return((word >> (boundary*8)) & 0xFF);
+}
+
 // This calculates the sum of absolute differences between two image blocks
 // unsigned char*a 		Pointer to first image
 // unsigned char*b 		Pointer to second image
@@ -145,10 +170,11 @@ __device__ unsigned calculate_sad(unsigned int* a,unsigned char* b,  int ax, int
 {
 	int sum=0;
 	int i,j;
+	count = 0;
 	for (i=0; i < 16; i++)
 		for (j=0; j < 16; j++)  
 			//sum += ABS( b[i*16+j] - get_pixel(a,bx+j,by+i,width,height) );
-			sum += ABS( b[i*16+j] - get_pixel_ref(a,bx+j,by+i,width,height) );
+			sum += ABS( b[i*16+j]/*get_pixel_current(b,j,i)*/ - get_pixel_ref(a,bx+j,by+i,width,height) );
 	return sum;
 }
 

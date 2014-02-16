@@ -29,7 +29,7 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
-extern __global__ void  motion_search(unsigned int* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy);
+extern __global__ void  motion_search(unsigned int* a,unsigned int* b, unsigned int width, unsigned int height, int* vx, int* vy);
 
 
 // Gets a pixel from the Luma plane of the image, takes care of boundaries
@@ -189,7 +189,8 @@ int main(int argc,char **args)
 {
 	//unsigned char* reference_frame;
 	unsigned int* ref_frame;
-	unsigned char* current_frame;
+	//unsigned char* current_frame;
+	unsigned int* current_frame;
 	int num_blocks=(1920*800)/(16*16);
 	//int vx[num_blocks];				// Reserve some memory for motion vectors
 	//int vx[num_blocks];				// Reserve some memory for motion vectors
@@ -202,12 +203,13 @@ int main(int argc,char **args)
 
 	//unsigned char* ref_gpu;
 	unsigned int* ref_gpu;
-	unsigned char* current_gpu;
+	//unsigned char* current_gpu;
+	unsigned int* current_gpu;
 	int* vx_gpu;
 	int* vy_gpu;
 	
 	load_picture_int(&ref_frame,"frameA.yuv");							// Load pictures
-	load_picture(&current_frame,"frameB.yuv");
+	load_picture_int(&current_frame,"frameB.yuv");
 	cudaEventCreate(&start);
 	cudaEventRecord(start, NULL); 
 
