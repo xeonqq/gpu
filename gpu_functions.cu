@@ -21,7 +21,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	//__shared__ uchar As[BLOCK_SIZEY * (BLOCK_SIZEX + (4*2))]; // Need 2 more tiles than the blockdim.x
 
 	__shared__ int SUMs[(BLOCK_SIZEX + 1) * BLOCK_SIZEY];//pading one column to the shared memory to resolve bank conflict
-	__shared__ int SUM_ROWs[(BLOCK_SIZEY+1)*BLOCK_SIZEX/4];//pading one column to the shared memory to resolve bank conflict
+	__shared__ int SUM_ROWs[BLOCK_SIZEX];//pading one column to the shared memory to resolve bank conflict
 	__shared__ int FINAL_SUMs[BLOCK_SIZEX/4];
 	__shared__ int BEST_Xs[BLOCK_SIZEX/4];
 	__shared__ int BEST_Ys[BLOCK_SIZEX/4];
@@ -65,21 +65,21 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 				SUMs[threadIdx.y * (blockDim.x + 1) + threadIdx.x] = sad;
 				__syncthreads();
 
-				if((threadIdx.x & 3) == 0)	 //%4 // want 16 threads in each tile to run (16 in y direction), summation rowwise
-				{
-					for(k = 0; k < 4; k++)
-					{
-						partial_sum += SUMs[threadIdx.y * (blockDim.x + 1) + threadIdx.x + k];
-					}
-					SUM_ROWs[threadIdx.y + (blockDim.y+1)*(threadIdx.x/4) ] = partial_sum;
-				}
-
-				__syncthreads();
-				if((threadIdx.y == 0) && (threadIdx.x < (blockDim.x/4))) //sum up 16 partial sums using one thread in each tile
+				if(threadIdx.y == 0)	 //%4 // want 16 threads in each tile to run (16 in y direction), summation rowwise
 				{
 					for(k = 0; k < 16; k++)
 					{
-						final_sum += SUM_ROWs[(blockDim.y+1)*threadIdx.x + k]; 
+						partial_sum += SUMs[k * (blockDim.x + 1) + threadIdx.x];
+					}
+					SUM_ROWs[threadIdx.x] = partial_sum;
+				}
+
+				__syncthreads();
+				if((threadIdx.y == 0) && (threadIdx.x < (blockDim.x/4))) //sum up 4 partial sums using one thread in each tile
+				{
+					for(k = 0; k < 4; k++)
+					{
+						final_sum += SUM_ROWs[4*threadIdx.x + k]; 
 					}
 					FINAL_SUMs[threadIdx.x] = final_sum; //store it in an array of number of tiles
 
