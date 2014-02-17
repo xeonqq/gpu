@@ -2,7 +2,7 @@
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
 __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned width, unsigned height);
-__device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height);
+__device__ unsigned calculate_sad(unsigned char* a,uchar4* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height);
 
 
 __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy)
@@ -12,11 +12,10 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 
 
 	int s,t;
-	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
-	int best_x,best_y=0;
-	int k,l;
+	//int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
+	int k;
 	int partial_sum = 0;
-
+	int final_sum = 0;
 	//unsigned char Bs[256];
 
 	__shared__ uchar4 Bs[BLOCK_SIZEX * BLOCK_SIZEY];
@@ -31,7 +30,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	
 
 
-	if((i < 800) && (j < (1920>>2)) )
+	if((i < 800) && (j < (1920/(blockDim.x/4))))
 	{
 
 		if(threadIdx.y == 0 && (threadIdx.x & 3) == 0)
@@ -43,7 +42,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
-				int sad=calculate_sad(a,Bs,0,0,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
+				int sad=calculate_sad(a,Bs,0,0,j*4 + t,i + s,  width, height);	// Calculate difference between block from first image and second image
 				SUMs[threadIdx.y * blockDim.x + threadIdx.x] = sad;
 				__syncthreads();
 
@@ -51,7 +50,7 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 				{
 					for(k = 0; k < 4; k++)
 					{
-						partial_sum += SUMs[threadIdx.y * blockDim.x + threadIdx.x + k]
+						partial_sum += SUMs[threadIdx.y * blockDim.x + threadIdx.x + k];
 					}
 					SUM_ROWs[threadIdx.y + blockDim.y*(threadIdx.x/(blockDim.x/4)) ] = partial_sum;
 				}
@@ -74,15 +73,14 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 
 				}
 				__syncthreads();
-				
+
 			}
 
-		//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
-		//printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
-	if((threadIdx.x < (blockDim.x/4)) && (threadIdx.y == 0))	 //%4
-	{
-		vx[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Xs[threadIdx.x];			// Store result
-		vy[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Ys[threadIdx.x];
+		if((threadIdx.x < (blockDim.x/4)) && (threadIdx.y == 0))	
+		{
+			vx[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Xs[threadIdx.x];			// Store result
+			vy[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Ys[threadIdx.x];
+		}
 	}
 }
 
@@ -143,12 +141,11 @@ __device__ uchar4 get_pixel_word(unsigned char* frame, int x, int y, unsigned in
 // int bx,int by			X and Y Position of the block in second image
 // int width			   Width of images
 // int height			   Height of images
-__device__ unsigned calculate_sad(unsigned char* a, unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height)
+__device__ unsigned calculate_sad(unsigned char* a, uchar4* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height)
 {
 	int sum=0;
-	int i,j;
 	uchar4 ref_word;
-	ref_word = get_pixel_word(a,bx+j,by+i,width,height);
+	ref_word = get_pixel_word(a,bx,by,width,height);
 
 	uchar4 from_share = b[threadIdx.y * blockDim.x + threadIdx.x];
 	sum += ABS( from_share.x - ref_word.x );

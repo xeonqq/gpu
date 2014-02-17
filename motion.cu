@@ -354,7 +354,7 @@ int main(int argc,char **args)
 		printf("current_gpu memcpy failed\n");
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
-	dim3 grid = dim3(((1920/(threads.x*4)+1),(800/(threads.y)+1);
+	dim3 grid = dim3((1920/(threads.x*4)+1),(800/(threads.y)+1));
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);
