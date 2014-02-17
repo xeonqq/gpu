@@ -14,8 +14,6 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 	int s,t;
 	//int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int k;
-	int partial_sum = 0;
-	int final_sum = 0;
 	//unsigned char Bs[256];
 
 	//__shared__ uchar4 Bs[BLOCK_SIZEX * BLOCK_SIZEY];
@@ -57,26 +55,27 @@ __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int w
 		{
 			BEST_DIFFs[threadIdx.x] = 16*16*256;
 		}
-		__syncthreads();
 
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
+				int partial_sum = 0;
+				int final_sum = 0;
 				int sad=calculate_sad(a,&B,0,0,j*4 + t,i + s,  width, height);	// Calculate difference between block from first image and second image
 				SUMs[threadIdx.y * blockDim.x + threadIdx.x] = sad;
 				__syncthreads();
 
-				if((threadIdx.x & 3) == 0)	 //%4 // want 16*(blockDim.x/4) threads to run (16 in y direction), summation rowwise
+				if((threadIdx.x & 3) == 0)	 //%4 // want 16 threads in each tile to run (16 in y direction), summation rowwise
 				{
 					for(k = 0; k < 4; k++)
 					{
 						partial_sum += SUMs[threadIdx.y * blockDim.x + threadIdx.x + k];
 					}
-					SUM_ROWs[threadIdx.y + blockDim.y*(threadIdx.x/(blockDim.x/4)) ] = partial_sum;
+					SUM_ROWs[threadIdx.y + blockDim.y*(threadIdx.x/4) ] = partial_sum;
 				}
 
 				__syncthreads();
-				if(threadIdx.y == 0 && threadIdx.x < (blockDim.x/4)) //sum up 16 partial sums using one thread in each tile
+				if((threadIdx.y == 0) && (threadIdx.x < (blockDim.x/4))) //sum up 16 partial sums using one thread in each tile
 				{
 					for(k = 0; k < 16; k++)
 					{
