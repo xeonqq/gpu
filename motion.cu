@@ -20,12 +20,8 @@ display -loop 0 -delay 1 -colorspace RGB -size 1920x800 -depth 8 frameA.yuv outp
 #include <stdio.h>
 #include <stdlib.h>
 
-//#include "gpu_functions.cuh"
-#define BLOCK_SIZEX 16 
-#define BLOCK_SIZEY 16
+#include "motion.h"
 
-#define THREAD_DIMX 1920/16	// Number of blocks in X direction
-#define THREAD_DIMY 800/16	// Number of blocks in Y direction
 
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
@@ -358,7 +354,7 @@ int main(int argc,char **args)
 		printf("current_gpu memcpy failed\n");
 
 	dim3 threads = dim3(BLOCK_SIZEX, BLOCK_SIZEY);
-	dim3 grid = dim3(((THREAD_DIMX/threads.x)+1),((THREAD_DIMY/threads.y))+1);
+	dim3 grid = dim3(((1920/(threads.x*4)+1),(800/(threads.y)+1);
 	//motion_search(ref_frame,current_frame,1920,800,vx,vy);	// Search for motion vectors
 
 	motion_search<<<grid,threads>>>(ref_gpu,current_gpu,1920,800,vx_gpu,vy_gpu);

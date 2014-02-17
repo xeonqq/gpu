@@ -1,47 +1,88 @@
+#include "motion.h"
 #define ABS(x) ( (x) < 0 ? -(x) : (x) )
 
 __device__ unsigned char get_pixel(unsigned char* frame, int x, int y, unsigned width, unsigned height);
 __device__ unsigned calculate_sad(unsigned char* a,unsigned char* b,  int ax, int ay, int bx, int by, unsigned width, unsigned height);
+
 
 __global__ void  motion_search(unsigned char* a,unsigned char* b, unsigned int width, unsigned int height, int* vx, int* vy)
 {
 	int i = blockIdx.y*blockDim.y+threadIdx.y; // Block in Y axis
 	int j = blockIdx.x*blockDim.x+threadIdx.x; // Block in X axis
 
-	int blocks_x = width/16;
-	int blocks_y = height/16;
 
 	int s,t;
 	int best_diff=16*16*256;			// This is larger than the largest possible absolute difference between two blocks
 	int best_x,best_y=0;
 	int k,l;
+	int partial_sum = 0;
 
+	//unsigned char Bs[256];
 
-	unsigned char Bs[256];
+	__shared__ uchar4 Bs[BLOCK_SIZEX * BLOCK_SIZEY];
+	__shared__ int SUMs[BLOCK_SIZEX * BLOCK_SIZEY];
+	__shared__ int SUM_ROWs[BLOCK_SIZEY*BLOCK_SIZEX/4];
+	__shared__ int FINAL_SUMs[BLOCK_SIZEX/4];
+	__shared__ int BEST_Xs[BLOCK_SIZEX/4];
+	__shared__ int BEST_Ys[BLOCK_SIZEX/4];
+	__shared__ int BEST_DIFFs[BLOCK_SIZEX/4];
+
+	Bs[threadIdx.y * blockDim.x + threadIdx.x] = *(((uchar4 *)b) + i * (width >> 2) + j);
 	
 
-	if((i < blocks_y) && (j < blocks_x) )
+
+	if((i < 800) && (j < (1920>>2)) )
 	{
-		for (k=0; k<16; k++)
-			for (l=0; l<16; l++)
-				Bs[k*16 + l] = b[((i*16+k) * width) + (j*16+l)];
+
+		if(threadIdx.y == 0 && (threadIdx.x & 3) == 0)
+		{
+			BEST_DIFFs[threadIdx.x/4] = 16*16*256;
+		}
+		__syncthreads();
 
 		for (s=-15 ; s<16 ; s++)		// Search through a -15 to 15 neighborhood
 			for (t=-15 ; t<16 ; t++)
 			{
 				int sad=calculate_sad(a,Bs,0,0,j*16+t,i*16+s,  width, height);	// Calculate difference between block from first image and second image
-				// Second image block shifted with (s,t)
-				if (sad < best_diff)			// If we found a better match then store it
+				SUMs[threadIdx.y * blockDim.x + threadIdx.x] = sad;
+				__syncthreads();
+
+				if((threadIdx.x & 3) == 0)	 //%4 // want 16*(blockDim.x/4) threads to run (16 in y direction), summation rowwise
 				{
-					best_x = t;
-					best_y = s;
-					best_diff = sad;
+					for(k = 0; k < 4; k++)
+					{
+						partial_sum += SUMs[threadIdx.y * blockDim.x + threadIdx.x + k]
+					}
+					SUM_ROWs[threadIdx.y + blockDim.y*(threadIdx.x/(blockDim.x/4)) ] = partial_sum;
 				}
+
+				__syncthreads();
+				if(threadIdx.y == 0 && (threadIdx.x & 3) == 0) //sum up 16 partial sums using one thread in each tile
+				{
+					for(k = 0; k < 16; k++)
+					{
+						final_sum += SUM_ROWs[blockDim.y*(threadIdx.x/(blockDim.x/4)) + k]; 
+					}
+					FINAL_SUMs[threadIdx.x/(blockDim.x/4)] = final_sum; //store it in an array of number of tiles
+
+					if (FINAL_SUMs[threadIdx.x/(blockDim.x/4)] < BEST_DIFFs[threadIdx.x/(blockDim.x/4)])			// If we found a better match then store it
+					{
+						BEST_Xs[threadIdx.x/(blockDim.x/4)] = t;
+						BEST_Ys[threadIdx.x/(blockDim.x/4)] = s;
+						BEST_DIFFs[threadIdx.x/(blockDim.x/4)] = FINAL_SUMs[threadIdx.x/(blockDim.x/4)];
+					}
+
+				}
+				__syncthreads();
+				
 			}
+
 		//		   printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
 		//printf("%i %i %f\n",best_x,best_y,best_diff/256.0f);  
-		vx[j+i*blocks_x] = best_x;			// Store result
-		vy[j+i*blocks_x] = best_y;
+	if((threadIdx.x < (blockDim.x/4)) && (threadIdx.y == 0))	 //%4
+	{
+		vx[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Xs[threadIdx.x];			// Store result
+		vy[blockIdx.y*width/16 + threadIdx.x + blockIdx.x*blockDim.x/4] = BEST_Ys[threadIdx.x];
 	}
 }
 
@@ -87,10 +128,10 @@ __device__ uchar4 get_pixel_word(unsigned char* frame, int x, int y, unsigned in
 	}
 	else
 	{
-			buf.x = get_pixel(frame,x,y,width,height);
-			buf.y = get_pixel(frame,x+1,y,width,height);
-			buf.z = get_pixel(frame,x+2,y,width,height);
-			buf.w = get_pixel(frame,x+3,y,width,height);
+		buf.x = get_pixel(frame,x,y,width,height);
+		buf.y = get_pixel(frame,x+1,y,width,height);
+		buf.z = get_pixel(frame,x+2,y,width,height);
+		buf.w = get_pixel(frame,x+3,y,width,height);
 	}
 	return buf;
 }
@@ -107,18 +148,17 @@ __device__ unsigned calculate_sad(unsigned char* a, unsigned char* b,  int ax, i
 	int sum=0;
 	int i,j;
 	uchar4 ref_word;
-	for (i=0; i < 16; i++)
-		for (j=0; j < 16; j+=4)
-		{
-			
-			ref_word = get_pixel_word(a,bx+j,by+i,width,height);
+	ref_word = get_pixel_word(a,bx+j,by+i,width,height);
 
-			sum += ABS( b[i*16 + j] - ref_word.x );
-			sum += ABS( b[i*16 + j+1] - ref_word.y );
-			sum += ABS( b[i*16 + j+2] - ref_word.z );
-			sum += ABS( b[i*16 + j+3] - ref_word.w );
-		}
-			//sum += ABS( b[i*16+j]/*get_pixel_current(b,j,i)*/ - get_pixel_ref(a,bx+j,by+i,width,height) );
+	uchar4 from_share = b[threadIdx.y * blockDim.x + threadIdx.x];
+	sum += ABS( from_share.x - ref_word.x );
+	sum += ABS( from_share.y - ref_word.y );
+	sum += ABS( from_share.z - ref_word.z );
+	sum += ABS( from_share.w - ref_word.w );
+
 	return sum;
+
+
+
 }
 
